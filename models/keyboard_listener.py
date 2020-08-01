@@ -1,3 +1,4 @@
+import asyncio
 from typing import TYPE_CHECKING
 
 from pynput import keyboard, mouse
@@ -10,8 +11,8 @@ from .other import KeyInfo
 
 
 class KeyboardListener:
-    def __init__(self, handler: "Manager"):
-        self.handler = handler
+    def __init__(self, manager: "Manager"):
+        self.manager = manager
         self.listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
         self.modifiers = KeyInfo(False, False, False, "")
 
@@ -30,7 +31,7 @@ class KeyboardListener:
         key.value: KeyCode
         """
         if hasattr(key, "char"):
-            self.handler.on_press(
+            self.manager.keyboard_on_press(
                 KeyInfo(ctrl=self.modifiers.ctrl, alt=self.modifiers.alt, shift=self.modifiers.shift, key=key.char,)
             )
         elif hasattr(key, "name"):
@@ -41,13 +42,13 @@ class KeyboardListener:
                 self.modifiers.alt = True
             elif key.name == "shift":
                 self.modifiers.shift = True
-            self.handler.on_press(
+            self.manager.keyboard_on_press(
                 KeyInfo(ctrl=self.modifiers.ctrl, alt=self.modifiers.alt, shift=self.modifiers.shift, key=key.name,)
             )
 
     def on_release(self, key: KeyCode):
         if hasattr(key, "char"):
-            self.handler.on_release(
+            self.manager.keyboard_on_release(
                 KeyInfo(ctrl=self.modifiers.ctrl, alt=self.modifiers.alt, shift=self.modifiers.shift, key=key.char,)
             )
         elif hasattr(key, "name"):
@@ -58,6 +59,15 @@ class KeyboardListener:
                 self.modifiers.alt = False
             elif key.name == "shift":
                 self.modifiers.shift = False
-            self.handler.on_release(
+            self.manager.keyboard_on_release(
                 KeyInfo(ctrl=self.modifiers.ctrl, alt=self.modifiers.alt, shift=self.modifiers.shift, key=key.name,)
             )
+
+
+if __name__ == "__main__":
+    # Local testing
+    async def main():
+        listener = KeyboardListener(None)
+        listener.start()
+
+    asyncio.run(main())
