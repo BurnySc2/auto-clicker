@@ -67,10 +67,11 @@ class Manager:
         return key_infos
 
     def add_hotkey(self, hotkey_combination: str, command: Union[KeyboardCommand, MouseCommand, ScriptCommand]):
+        # TODO Detect duplicate hotkey combinations
         assert isinstance(command, (KeyboardCommand, MouseCommand, ScriptCommand)), f"{type(command)}"
         # TODO Ignore case sensitivity
         hotkeys = self.parse_hotkey_combination(hotkey_combination)
-        if len(hotkeys) == 1 or not all(hotkey == hotkeys[index + 1] for index, hotkey in enumerate(hotkeys[:-1])):
+        if len(hotkeys) != 1 and not all(hotkey == hotkeys[index + 1] for index, hotkey in enumerate(hotkeys[:-1])):
             logger.warning(
                 f"Your hotkey combination is {hotkey_combination}. You proably do not want that unless you only want to trigger the hotkey once a specific amount of the same button has been pressed."
             )

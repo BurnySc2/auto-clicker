@@ -151,10 +151,10 @@ class Action:
             elif isinstance(action, KeyInfo):
                 # Press keyboard hotkey / combination
                 if action.duration > 0:
-                    await self.manager.keyboard_presser.hold_down_button(self.manager, action)
+                    await self.manager.keyboard_presser.hold_down_button(action)
                 else:
                     self.manager.ignore_next_key_press += 1
-                    await self.manager.keyboard_presser.press_hotkey(self.manager, action)
+                    await self.manager.keyboard_presser.press_hotkey(action)
             elif isinstance(action, MouseInfo):
                 # Press mouse
                 await self.manager.mouse_clicker.do_mouse_action(action)
