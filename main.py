@@ -1,27 +1,10 @@
 # Other
-import time
-import os
-import sys
-import re
-import time
-import json
-from contextlib import contextmanager
-from pathlib import Path
-from dataclasses import dataclass
-
-# https://pypi.org/project/dataclasses-json/#description
-from dataclasses_json import DataClassJsonMixin
-
 # Coroutines and multiprocessing
 import asyncio
-import aiohttp
-from multiprocessing import Process, Lock, Pool
+import sys
 
 # Simple logging https://github.com/Delgan/loguru
 from loguru import logger
-
-# Database
-import sqlite3
 
 # Remove previous default handlers
 from models.keyboard_presser import KeyboardAction, KeyboardCommand
@@ -33,11 +16,8 @@ logger.add(sys.stdout, level="INFO")
 # Log to file, max size 1 mb
 logger.add("main.log", rotation="1 MB", level="INFO")
 
-# Type annotation / hints
-from typing import List, Iterable, Union, Set, Optional
-
 from models.manager import Manager
-from models.other import KeyInfo, Command, ScriptCommand, MouseInfo, Click
+from models.other import KeyInfo, ScriptCommand, MouseInfo, Click
 
 
 async def main():
@@ -70,6 +50,7 @@ async def main():
             ),
         ),
     )
+
     # Pressing escape will terminate this script
     # Can also be "async def my_exit()"
     def my_exit():

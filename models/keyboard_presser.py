@@ -1,5 +1,5 @@
-from dataclasses import field, dataclass
-from typing import TYPE_CHECKING, List, Generator, Union, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from .manager import Manager
@@ -15,7 +15,7 @@ class KeyboardPresser:
     def __init__(self, manager: "Manager"):
         self.manager = manager
 
-    async def press_hotkey(self, manager: "Manager", key_info: KeyInfo, verbose=True):
+    async def press_hotkey(self, key_info: KeyInfo, verbose=True):
         """ Presses a hotkey combination. """
         if verbose:
             logger.info(f"Pressing hotkey: {key_info.to_hotkey_list}")
@@ -29,7 +29,7 @@ class KeyboardPresser:
             await self.press_hotkey(key_info, verbose=False)
             await asyncio.sleep(key_info.delay / 1000)
 
-    async def hold_down_button(self, manager: "Manager", key_info: KeyInfo):
+    async def hold_down_button(self, key_info: KeyInfo):
         """ Hold down a button for X milliseconds. """
         key = key_info.key
         # Hold down MODIFIERS
@@ -40,7 +40,7 @@ class KeyboardPresser:
                     pyautogui.keyDown(f"{modifier_str}")
 
             # Hold down key
-            manager.ignore_next_key_press += 1
+            self.manager.ignore_next_key_press += 1
             logger.info(f"Holding down button: {key_info.key}")
             pyautogui.keyDown(f"{key}")
 
@@ -50,7 +50,7 @@ class KeyboardPresser:
         # Release key
         with self.manager.lock:
             logger.info(f"Releasing button: {key}")
-            manager.ignore_next_key_release += 1
+            self.manager.ignore_next_key_release += 1
             pyautogui.keyUp(f"{key}")
 
             # Release MODIFIERS

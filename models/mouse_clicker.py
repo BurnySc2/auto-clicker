@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional, List, Generator, Union
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional, List
 
 if TYPE_CHECKING:
     from .manager import Manager
@@ -33,9 +33,9 @@ class MouseClicker:
         logger.info(f"Moving mouse to x={x} y={y} over duration {duration_milliseconds}")
         pyautogui.moveTo(x, y, duration=duration_milliseconds / 1000)
 
-    async def do_mouse_action(self, manager: "Manager", mouse_info: MouseInfo):
+    async def do_mouse_action(self, mouse_info: MouseInfo):
         """ Do one mouse action """
-        with manager.lock:
+        with self.manager.lock:
             if mouse_info.click == Click.Move:
                 await self._move(mouse_info.x, mouse_info.y, mouse_info.duration)
             elif mouse_info.click == Click.DoubleClick:

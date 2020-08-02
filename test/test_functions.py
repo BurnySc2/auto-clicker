@@ -1,14 +1,10 @@
-import sys
 import os
-
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-
+import sys
 import pytest
-import aiohttp
-import time
-from pathlib import Path
 from hypothesis import given
 import hypothesis.strategies as st
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 
 @pytest.mark.asyncio

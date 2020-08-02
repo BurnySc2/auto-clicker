@@ -1,7 +1,7 @@
 import asyncio
 from typing import TYPE_CHECKING
 
-from pynput import keyboard, mouse
+from pynput import keyboard
 from pynput.keyboard import KeyCode
 
 if TYPE_CHECKING:

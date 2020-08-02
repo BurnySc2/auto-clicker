@@ -1,15 +1,15 @@
 import asyncio
 import sys
-from threading import Thread, RLock
-from typing import List, Dict, Union, Deque
 from collections import deque
+from threading import Thread, RLock
+from typing import List, Union, Deque
 
 from loguru import logger
 
 from models.keyboard_listener import KeyboardListener
 from models.keyboard_presser import KeyboardPresser, KeyboardCommand
 from models.mouse_clicker import MouseClicker, MouseCommand
-from models.other import KeyInfo, Command, VALID_KEYS, KEYS_WITH_MODIFIERS, ScriptCommand
+from models.other import KeyInfo, VALID_KEYS, KEYS_WITH_MODIFIERS, ScriptCommand
 
 """
 Need to be able to apply commands like:

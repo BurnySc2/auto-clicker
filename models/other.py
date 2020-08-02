@@ -1,16 +1,12 @@
 import asyncio
 import enum
 import string
-import time
 from dataclasses import dataclass, field
 from typing import Optional, List, Generator, Union, Deque, Awaitable, TYPE_CHECKING
 
 
 if TYPE_CHECKING:
     from models.manager import Manager
-
-from loguru import logger
-
 
 VALID_KEYS = {"space", "esc"}
 # Add numbers and lower case letters
@@ -161,7 +157,7 @@ class Action:
                     await self.manager.keyboard_presser.press_hotkey(self.manager, action)
             elif isinstance(action, MouseInfo):
                 # Press mouse
-                await self.manager.mouse_clicker.do_mouse_action(self.manager, action)
+                await self.manager.mouse_clicker.do_mouse_action(action)
 
 
 @dataclass
