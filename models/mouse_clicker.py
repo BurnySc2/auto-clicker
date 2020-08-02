@@ -1,9 +1,10 @@
-from typing import TYPE_CHECKING, Optional, List
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional, List, Generator, Union
 
 if TYPE_CHECKING:
     from .manager import Manager
 
-from models.other import MouseInfo, Click
+from models.other import MouseInfo, Click, Command, Action
 import pyautogui
 import asyncio
 from loguru import logger
@@ -32,24 +33,47 @@ class MouseClicker:
         logger.info(f"Moving mouse to x={x} y={y} over duration {duration_milliseconds}")
         pyautogui.moveTo(x, y, duration=duration_milliseconds / 1000)
 
-    async def do_mouse_action(self, mouse_info: MouseInfo):
+    async def do_mouse_action(self, manager: "Manager", mouse_info: MouseInfo):
         """ Do one mouse action """
-        if mouse_info.click == Click.Move:
-            await self._move(mouse_info.x, mouse_info.y, mouse_info.duration)
-        elif mouse_info.click == Click.DoubleClick:
-            await self._double_click(mouse_info.x, mouse_info.y)
-        elif mouse_info.click == Click.Left:
-            await self._left_click(mouse_info.x, mouse_info.y)
-        elif mouse_info.click == Click.Right:
-            await self._right_click(mouse_info.x, mouse_info.y)
-        elif mouse_info.click == Click.Middle:
-            await self._middle_click(mouse_info.x, mouse_info.y)
+        with manager.lock:
+            if mouse_info.click == Click.Move:
+                await self._move(mouse_info.x, mouse_info.y, mouse_info.duration)
+            elif mouse_info.click == Click.DoubleClick:
+                await self._double_click(mouse_info.x, mouse_info.y)
+            elif mouse_info.click == Click.Left:
+                await self._left_click(mouse_info.x, mouse_info.y)
+            elif mouse_info.click == Click.Right:
+                await self._right_click(mouse_info.x, mouse_info.y)
+            elif mouse_info.click == Click.Middle:
+                await self._middle_click(mouse_info.x, mouse_info.y)
 
     async def do_mouse_actions(self, mouse_infos: List[MouseInfo]):
-        """ Do a sequence of mouse actions: click, move, double click, right click """
+        """ Do a sequence of mouse action: click, move, double click, right click """
         for mouse_info in mouse_infos:
             await self.do_mouse_action(mouse_info)
             await asyncio.sleep(mouse_info.delay / 1000)
+
+
+@dataclass
+class MouseAction(Action):
+    # Coordinates where to click, set to 'None' if mouse should not move
+    coordinate_x: Optional[int] = None
+    coordinate_y: Optional[int] = None
+    # Coordinaates where to click relative from current position
+    relative_x: Optional[int] = None
+    relative_y: Optional[int] = None
+
+    def __post_init__(self):
+        assert self.mouse_actions, f"Action field is empty"
+        # TODO Only one field needs to be used: coordinate or relative or none of them
+
+
+@dataclass
+class MouseCommand(Command):
+    mouse_action: MouseAction = None
+
+    def __post_init__(self):
+        assert isinstance(self.mouse_action, MouseAction)
 
 
 if __name__ == "__main__":

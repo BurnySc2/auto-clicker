@@ -1,14 +1,27 @@
+import asyncio
 import enum
+import string
 import time
 from dataclasses import dataclass, field
-from typing import Optional, List, Generator, Union
+from typing import Optional, List, Generator, Union, Deque, Awaitable, TYPE_CHECKING
 
 
-class InputMode(enum.Enum):
-    # The condition when the action should be triggered
-    Undefined = 0
-    OnPressed = 1
-    OnReleased = 2
+if TYPE_CHECKING:
+    from models.manager import Manager
+
+from loguru import logger
+
+
+VALID_KEYS = {"space", "esc"}
+# Add numbers and lower case letters
+for key in string.ascii_lowercase + string.digits:
+    VALID_KEYS.add(key)
+# Add f1 to f12
+for number in range(1, 13):
+    VALID_KEYS.add(f"f{number}")
+
+MODIFIERS = ["ctrl", "alt", "shift"]
+KEYS_WITH_MODIFIERS = VALID_KEYS | set(MODIFIERS)
 
 
 class Click(enum.Enum):
@@ -26,7 +39,7 @@ class Click(enum.Enum):
 
 @dataclass
 class MouseInfo:
-    click: Click
+    click: Click = Click.Left
     # Move to monitor coordinaate
     x: Optional[int] = None
     y: Optional[int] = None
@@ -41,16 +54,23 @@ class MouseInfo:
 
 @dataclass
 class KeyInfo:
-    # Which key to press
+    # Which key to press or was pressed
     key: str
-    # Which modifiers to hold down when pressing the key
+    # Which MODIFIERS to hold down when pressing the key
     ctrl: bool = None
     alt: bool = None
     shift: bool = None
-    # When pressing hotkeys: delay between keyboard actions
+    # When pressing hotkeys: delay between keyboard action
     delay: int = 0
     # When holding down a key: duration how long a key will be held down
     duration: int = 0
+
+    def __post_init__(self):
+        assert len(key) > 0, f"Key needs to be at least of length 1: {self.key}"
+
+    @classmethod
+    def from_text(cls, text: str, key_delay: int = 0) -> List["KeyInfo"]:
+        return [KeyInfo(key, delay=key_delay) for key in text]
 
     @property
     def to_hotkey_list(self) -> List[str]:
@@ -64,17 +84,48 @@ class KeyInfo:
         keys.append(self.key)
         return keys
 
+    def copy(self) -> "KeyInfo":
+        return KeyInfo(self.key, self.ctrl, self.alt, self.shift, self.delay, self.duration)
+
+    def __eq__(self, other: "KeyInfo"):
+        assert isinstance(other, KeyInfo)
+        return self.key == other.key and all(
+            self_modifier is None or other_modifier is None or self_modifier is other_modifier
+            for self_modifier, other_modifier in zip(
+                [self.ctrl, self.alt, self.shift], [other.ctrl, other.alt, other.shift]
+            )
+        )
+
+    def __ne__(self, other: "KeyInfo"):
+        # TODO Is this needed or will __eq__ suffice? I assume dataclass will have its own __ne__ function so I will have override it
+        return not (self == other)
+
 
 @dataclass
-class KeyboardAction:
-    # The text to write
-    text: str = ""
-    # Between each character, have this amount of milliseconds delay
-    character_delay: int = 0
-    # Before executing this action, how much delay should there be
-    start_delay: int = 0
+class Action:
+    manager: "Manager"
 
-    def next(self) -> Generator[Union[int, KeyInfo], None, None]:
+    # For mouse actions: where to click
+    mouse_actions: List[MouseInfo] = field(default_factory=lambda: [])
+
+    # For keyboard actions: hotkeys to press
+    hotkeys_to_press: List[KeyInfo] = field(default_factory=lambda: [])
+
+    # How long it should wait before the action should be started
+    start_delay: int = 0
+    # Once it has been executed the first time, whats the delay (in ms) for the next execution?
+    repeat_delay: int = 10
+    # How often will it be repeated? Will be ignored if option_toggle is set to 'True'
+    repeat_amount: int = 0
+    # TODO Toggle on / off
+    toggled_state: bool = False
+
+    def __post_init__(self):
+        assert self.start_delay >= 0, f"{self.start_delay}"
+        assert self.repeat_delay >= 0, f"{self.repeat_delay}"
+        assert self.repeat_amount >= 0, f"{self.repeat_amount}"
+
+    def actions(self) -> Generator[Union[int, Union[KeyInfo, MouseInfo]], None, None]:
         """
         This function returns the instruction to the thread:
         yield an integer which means waiting time in milliseconds
@@ -83,77 +134,86 @@ class KeyboardAction:
         """
         if self.start_delay:
             yield self.start_delay
-        # TODO
-        """
-        What kind of actions should be allowed?
-        
-        write text (with modifiers, ctrl alt shift): abcd with start delay and character delay, if toggled: repeat text?
-        pyautogui.hotkey('ctrl', 'c')
-        
-        hold down a key for X seconds and another key for Y seconds
-        
-        """
+        while 1:
+            for _ in range(self.repeat_amount + 1):
+                for key_info in self.hotkeys_to_press:
+                    assert isinstance(key_info, KeyInfo)
+                    yield key_info
+                    yield key_info.delay
+                for mouse_info in self.mouse_actions:
+                    assert isinstance(mouse_info, MouseInfo)
+                    yield mouse_info
+                    yield mouse_info.delay
+                yield self.repeat_delay
+            if not self.toggled_state:
+                return
 
-
-@dataclass
-class MouseAction:
-    # The text to write
-    click: Click = Click.Left
-    # Coordinates where to click, set to 'None' if mouse should not move
-    coordinate_x: Optional[int] = None
-    coordinate_y: Optional[int] = None
-    # Coordinaates where to click relative from current position
-    relative_x: Optional[int] = None
-    relative_y: Optional[int] = None
-
-    # Before executing this action, how much delay should there be
-    start_delay: int = 0
+    async def execute(self):
+        for action in self.actions():
+            if isinstance(action, int):
+                await asyncio.sleep(action / 1000)
+            elif isinstance(action, KeyInfo):
+                # Press keyboard hotkey / combination
+                if action.duration > 0:
+                    await self.manager.keyboard_presser.hold_down_button(self.manager, action)
+                else:
+                    self.manager.ignore_next_key_press += 1
+                    await self.manager.keyboard_presser.press_hotkey(self.manager, action)
+            elif isinstance(action, MouseInfo):
+                # Press mouse
+                await self.manager.mouse_clicker.do_mouse_action(self.manager, action)
 
 
 @dataclass
 class Command:
-    # CONDITIONS
-
-    # Condition for modifiers: None if doesnt matter, True if modifier has to be active, False if modifier has to be not held down
-    condition_ctrl: Optional[bool] = None
-    condition_alt: Optional[bool] = None
-    condition_shift: Optional[bool] = None
-
-    # Which key to listen to
-    condition_key: Optional[str] = None
-    # 0 = on_pressed, 1 = keyboard_on_release
-    condition_keyboard_mode: InputMode = InputMode.OnPressed
+    # TRIGGER CONDITIONS
+    hotkeys: List[KeyInfo] = field(default_factory=lambda: [])
 
     # Which mouse click to listen to
     condition_mouse: Optional[Click] = None
-    # 0 = on_pressed, 1 = keyboard_on_release
-    condition_mouse_mode: InputMode = InputMode.OnPressed
 
     # OPTIONS
-
     # TODO Should this action be active until toggled off again?
     # option_toggle: bool = False
 
-    # How long it should wait before the action should be started
-    option_start_delay: int = 0
-    # Once it has been executed the first time, whats the delay (in ms) for the next execution?
-    option_repeat_delay: int = 10
-    # How often will it be repeated? Will be ignored if option_toggle is set to 'True'
-    option_repeat_count: int = 1
+    def __post_init__(self):
+        assert not self.hotkeys, f"Do not enter data here. Will be filled out automatically by the script."
 
-    # EXECUTION
-
-    # Modifiers that should be used when the action is executed
-    execute_use_ctrl: Optional[bool] = None
-    exucte_use_alt: Optional[bool] = None
-    exucte_use_shift: Optional[bool] = None
+    def pressed_keys_match_hotkey(self, previous_hotkeys: Deque[KeyInfo]) -> bool:
+        if len(self.hotkeys) > len(previous_hotkeys):
+            return False
+        for hotkey, previous_hotkey in zip(reversed(self.hotkeys), previous_hotkeys):
+            if hotkey != previous_hotkey:
+                return False
+        return True
 
 
 @dataclass
-class KeyboardCommand(Command):
-    execute_actions: List[KeyboardAction] = field(default_factory=lambda: [])
+class ScriptCommand(Command):
+    functions: List[Union[callable, Awaitable]] = field(default_factory=lambda: [])
+    start_delay: int = 0
 
+    def __post_init__(self):
+        assert self.start_delay >= 0, f"{self.start_delay}"
 
-@dataclass
-class MouseCommand(Command):
-    execute_actions: List[MouseAction] = field(default_factory=lambda: [])
+    async def execute(self):
+        if self.start_delay:
+            await asyncio.sleep(self.start_delay / 1000)
+
+        for execute_function in self.functions:
+            # logger.info(f"Type iscallable: {callable(execute_function)}")
+            # logger.info(f"Type isfuture: {asyncio.isfuture(execute_function)}")
+            # logger.info(f"Type iscoroutine: {asyncio.iscoroutine(execute_function)}")
+            # logger.info(f"Type iscoroutinefunction: {asyncio.iscoroutinefunction(execute_function)}")
+
+            # # Is Async function
+            if asyncio.iscoroutinefunction(execute_function):
+                asyncio.create_task(execute_function())
+                # await execute_function()
+            # Is Async function but already was executed() but not awaited
+            elif asyncio.iscoroutine(execute_function):
+                asyncio.create_task(execute_function)
+                # await execute_function
+            # Is just a normal function waiting to be called
+            elif callable(execute_function):
+                execute_function()
