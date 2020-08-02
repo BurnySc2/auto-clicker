@@ -162,11 +162,10 @@ class Action:
 
 @dataclass
 class Command:
+    """ The class to check if a hotkey combination was pressed. """
+
     # TRIGGER CONDITIONS
     hotkeys: List[KeyInfo] = field(default_factory=lambda: [])
-
-    # Which mouse click to listen to
-    condition_mouse: Optional[Click] = None
 
     # OPTIONS
     # TODO Should this action be active until toggled off again?
@@ -186,6 +185,8 @@ class Command:
 
 @dataclass
 class ScriptCommand(Command):
+    """ Executes scripts / functions on hotkey. """
+
     functions: List[Union[callable, Awaitable]] = field(default_factory=lambda: [])
     start_delay: int = 0
 

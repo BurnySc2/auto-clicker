@@ -25,11 +25,6 @@ async def main():
 
     # Examples
 
-    # Add a command which listens to keyboard press combination 'alt+f', wait 1 second, press left click 5 times (with delay of 5ms)
-    # manager.add_hotkey(
-    #     "alt+1", MouseCommand(start_delay=1000, repeat_delay=5, repeat_count=10, execute_actions=[MouseAction()],)
-    # )
-
     # Hotkey "alt+1": Left click 3 times (initial click + 2 repeat clicks) which should select the whole line
     manager.add_hotkey(
         "alt+1",
@@ -45,6 +40,7 @@ async def main():
     manager.add_hotkey(
         ",".join(hotkey_text),
         KeyboardCommand(
+            # TODO Simplify so that i dont have to pass 'manager' as parameter
             keyboard_action=KeyboardAction(
                 manager, hotkeys_to_press=KeyInfo.from_text(" whats up buddy", key_delay=0), start_delay=1000
             ),
